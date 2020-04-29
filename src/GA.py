@@ -2,8 +2,8 @@
 import math
 import random
 import copy
-import time
-from random import randint
+
+# from random import randint, random
 from PopGenerator import PopGenerator
 from Selectors import Selectors
 from Intraroute import Intraroute
@@ -166,23 +166,39 @@ class GA():
 
         return best_tmp
 
-    def start(self, graph, m, evaluator_min):
+    @staticmethod
+    def get_min_by_hierarchy(population, min_nodes, max_nodes):
+        pf = 0.5
+        for i in range(0, len(population)):
+            for j in range(0, len(population)-1):
+                u = random.random()
+                if (population[j].is_feasible() and population[j+1].is_feasible()) or u <= pf:
+                    if population[j].fitness > population[j+1].fitness:
+                        population[j], population[j+1] = population[j+1], population[j]
+
+                else:
+                    if population[j].feasibility > population[j+1].feasibility:
+                        population[j], population[j+1] = population[j+1], population[j]   
+
+        return population[0]
+
+    def get_feasible_count(self, population):
+        return len([i for i in population if i.is_feasible() is True])
+
+    def start(self, max_iters, graph, m, evaluator_min):
 
         n = len(graph)
-        min_nodes = int(n/(m+1))
+        min_nodes = math.ceil(n/(m+1))
         max_nodes = int(n/(m-1))
         # min_nodes = 15
         # max_nodes = 30
 
-        intraroute = Intraroute()
-
         population = self.pop_generator.create_population(100, n, m, min_nodes, max_nodes)
         best_global = None
 
-        start = time.time()
-        max_iters = 8000
         iter = 0
         data = []
+        feasibility_list = []
         while iter < max_iters:
             # evaluate population
             population = [self.fitness_function(i, graph) for i in population]
@@ -191,6 +207,7 @@ class GA():
             # get best individual of this generation
             best_local = evaluator_min(population, min_nodes, max_nodes)
             data.append(best_local.fitness)    
+            # feasibility_list.append(self.get_feasible_count(population))
 
             # replace global best if necessary
             if best_global is None:
@@ -198,18 +215,16 @@ class GA():
             else:
                 best_global = evaluator_min([best_global, best_local], min_nodes, max_nodes)
 
-            print(str(iter)+': '+str(best_local.fitness))
+            # print(str(iter)+': '+str(best_local.fitness))
+            # print('fesible solutions: '+str(self.get_feasible_count(population)))
 
             # mutate full population
             population = self.ga_operation_IPGA(population, n, m, min_nodes, max_nodes, graph, evaluator_min)
             iter += 1
 
-        result = GAResult(data, best_global)
-        print('constraints violated: '+str(best_global.feasibility))
-        print(best_global.route)
-        print(best_global.breaks)
-        print('best found: '+str(best_global.fitness))
-        end = time.time()
-        print('time elapsed: '+str(end - start))
-
+        result = GAResult(data, best_global, feasibility_list)
+        # print('constraints violated: '+str(best_global.feasibility))
+        # print(best_global.route)
+        # print(best_global.breaks)
+        # print('best found: '+str(best_global.fitness))
         return result
